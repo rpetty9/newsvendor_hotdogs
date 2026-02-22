@@ -490,84 +490,104 @@ def render_scoreboard(
 
     <!-- IMPORTANT: CSS must be INSIDE this iframe -->
     <style>
-    .badge-ticker {{
+        .badge-ticker {{
         position: relative;
         overflow: hidden;
         background: #F8FAFF;
         border-top: 1px solid #E0E3EB;
         padding: 10px 12px;
         white-space: nowrap;
-    }}
+        }}
 
-    .badge-track {{
+        .badge-track {{
         display: inline-flex;
         gap: 10px;
         width: max-content;
         will-change: transform;
         animation: badge-scroll 18s linear infinite;
-    }}
+        }}
 
-    /* optional: pause on hover */
-    .badge-ticker:hover .badge-track {{
+        /* optional: pause on hover */
+        .badge-ticker:hover .badge-track {{
         animation-play-state: paused;
-    }}
+        }}
 
-    @keyframes badge-scroll {{
+        @keyframes badge-scroll {{
         0%   {{ transform: translateX(0); }}
         100% {{ transform: translateX(-50%); }}
-    }}
+        }}
 
-    /* =========================
+        /* =========================
         MOBILE-ONLY SCOREBOARD FIX
         (Desktop unchanged)
         ========================= */
-    @media (max-width: 520px) {{
+        @media (max-width: 520px) {{
         .sb-top-row {{
-        flex-wrap: wrap !important;
-        gap: 10px !important;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
         }}
 
-        /* VS becomes a full-width divider so cards don't squeeze */
-        .sb-vs {{
-        min-width: 0 !important;
-        flex: 1 1 100% !important;
-        flex-direction: row !important;
-        gap: 10px !important;
-        justify-content: center !important;
-        opacity: 0.65;
-        }}
-        .sb-vs-line {{
-        width: 44px !important;
-        }}
-
-        /* Cards can expand full width on narrow screens */
+        /* Cards stack full-width on narrow screens */
         .sb-card {{
-        max-width: none !important;
-        flex: 1 1 100% !important;
+            max-width: none !important;
+            flex: 1 1 100% !important;
         }}
 
-        /* Prevent money breaking like "$65,90" */
+        /* Prevent value breaking like "$65,90" */
         .sb-big-value {{
-        white-space: nowrap !important;
-        font-size: 28px !important;   /* slightly smaller on mobile */
-        line-height: 1.05 !important;
+            white-space: nowrap !important;
+            font-size: 28px !important; /* slightly smaller on mobile */
+            line-height: 1.05 !important;
         }}
-    }}
+
+        /* Make VS a clean divider row:  —— VS ——  */
+        .sb-vs {{
+            flex: 1 1 100% !important;
+            min-width: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-direction: row !important;
+            gap: 10px !important;
+            padding: 4px 0 !important;
+            opacity: 0.55;
+        }}
+
+        .sb-vs::before,
+        .sb-vs::after {{
+            content: "";
+            height: 2px;
+            background: #E0E3EB;
+            border-radius: 999px;
+            flex: 1 1 auto;
+            max-width: 140px;
+        }}
+
+        /* Hide the old little line block */
+        .sb-vs-line {{
+            display: none !important;
+        }}
+
+        /* Slightly tighten ticker padding on mobile (helps a bit) */
+        .badge-ticker {{
+            padding: 8px 10px !important;
+        }}
+        }}
     </style>
 
     <!-- OUTER SCOREBOARD (the mounted unit) -->
     <div style="
-    width: 100%;
-    max-width: 980px;
-    border: 1px solid #E0E3EB;
-    border-radius: 18px;
-    background: #FFFFFF;
-    box-shadow: 0 10px 28px rgba(17,24,39,0.08);
-    overflow: hidden;
+        width: 100%;
+        max-width: 980px;
+        border: 1px solid #E0E3EB;
+        border-radius: 18px;
+        background: #FFFFFF;
+        box-shadow: 0 10px 28px rgba(17,24,39,0.08);
+        overflow: hidden;
     ">
 
-    <!-- HEADER BAR -->
-    <div style="
+        <!-- HEADER BAR -->
+        <div style="
         padding: 10px 14px;
         background: linear-gradient(180deg, #FAFBFF, #FFFFFF);
         border-bottom: 1px solid #E0E3EB;
@@ -575,69 +595,70 @@ def render_scoreboard(
         align-items:center;
         justify-content:center;
         gap:10px;
-    ">
+        ">
         <div style="font-weight:900; letter-spacing:0.14em; color:#6B7280; font-size:12px;">
-        GAME DAY SCOREBOARD
+            GAME DAY SCOREBOARD
         </div>
-    </div>
+        </div>
 
-    <!-- INNER "SCREEN" AREA -->
-    <div style="padding: 14px 14px 12px; background:#FFFFFF;">
+        <!-- INNER "SCREEN" AREA -->
+        <div style="padding: 14px 14px 12px; background:#FFFFFF;">
 
         <!-- Big cards row -->
         <div style="
-        background:#FAFBFF;
-        border:1px solid #E0E3EB;
-        border-radius: 16px;
-        padding: 12px;
+            background:#FAFBFF;
+            border:1px solid #E0E3EB;
+            border-radius: 16px;
+            padding: 12px;
         ">
 
-        <div class="sb-top-row" style="display:flex; gap:14px; align-items:stretch; justify-content:center;">
+            <div class="sb-top-row" style="display:flex; gap:14px; align-items:stretch; justify-content:center;">
             <div class="sb-card" style="flex:1; max-width:420px; padding:14px 16px; border-radius:14px; background:#FFFFFF; border:1px solid #E0E3EB; text-align:center;">
-            <div style="font-size:12px; letter-spacing:0.12em; color:#6B7280; font-weight:800;">{left_label}</div>
-            <div class="sb-big-value" style="font-size:30px; font-weight:950; color:#111827; margin-top:2px;">{left_value}</div>
+                <div style="font-size:12px; letter-spacing:0.12em; color:#6B7280; font-weight:800;">{left_label}</div>
+                <div class="sb-big-value" style="font-size:30px; font-weight:950; color:#111827; margin-top:2px;">{left_value}</div>
             </div>
 
             <div class="sb-vs" style="min-width:66px; display:flex; align-items:center; justify-content:center; flex-direction:column;">
-            <div style="font-size:12px; letter-spacing:0.16em; color:#9CA3AF; font-weight:900; text-align:center;">VS</div>
-            <div class="sb-vs-line" style="margin-top:4px; width:36px; height:2px; border-radius:999px; background:#E0E3EB;"></div>
+                <div style="font-size:12px; letter-spacing:0.16em; color:#9CA3AF; font-weight:900; text-align:center;">VS</div>
+                <div class="sb-vs-line" style="margin-top:4px; width:36px; height:2px; border-radius:999px; background:#E0E3EB;"></div>
             </div>
 
             <div class="sb-card" style="flex:1; max-width:420px; padding:14px 16px; border-radius:14px; background:#FFFFFF; border:1px solid #E0E3EB; text-align:center;">
-            <div style="font-size:12px; letter-spacing:0.12em; color:#6B7280; font-weight:800;">{right_label}</div>
-            <div class="sb-big-value" style="font-size:30px; font-weight:950; color:#111827; margin-top:2px;">{right_value}</div>
+                <div style="font-size:12px; letter-spacing:0.12em; color:#6B7280; font-weight:800;">{right_label}</div>
+                <div class="sb-big-value" style="font-size:30px; font-weight:950; color:#111827; margin-top:2px;">{right_value}</div>
             </div>
-        </div>
+            </div>
 
-        <!-- Subscores row -->
-        <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+            <!-- Subscores row -->
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
             <div style="flex:1; max-width:270px; padding:10px 12px; border-radius:12px; background:#FFFFFF; border:1px solid #E0E3EB;">
-            <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Stockout Rate</div>
-            <div style="font-size:18px; font-weight:900; color:#111827; text-align:center;">{so}</div>
-            </div>
-            <div style="flex:1; max-width:270px; padding:10px 12px; border-radius:12px; background:#FFFFFF; border:1px solid #E0E3EB;">
-            <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Sellout Rate</div>
-            <div style="font-size:18px; font-weight:900; color:#111827; text-align:center;">{se}</div>
+                <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Stockout Rate</div>
+                <div style="font-size:18px; font-weight:900; color:#111827; text-align:center;">{so}</div>
             </div>
             <div style="flex:1; max-width:270px; padding:10px 12px; border-radius:12px; background:#FFFFFF; border:1px solid #E0E3EB;">
-            <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Avg Attendance</div>
-            <div style="font-size:18px; font-weight:900; color:#111827; text-align:center;">{aa}</div>
+                <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Sellout Rate</div>
+                <div style="font-size:18px; font-weight:900; color:#111827; text-align:center;">{se}</div>
             </div>
-        </div>
+            <div style="flex:1; max-width:270px; padding:10px 12px; border-radius:12px; background:#FFFFFF; border:1px solid #E0E3EB;">
+                <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Avg Attendance</div>
+                <div style="font-size:18px; font-weight:900; color:#111827; text-align:center;">{aa}</div>
+            </div>
+            </div>
 
         </div>
-    </div>
+        </div>
 
-    <!-- BADGE TICKER STRIP (looping) -->
-    <div class="badge-ticker">
+        <!-- BADGE TICKER STRIP (looping) -->
+        <div class="badge-ticker">
         <div class="badge-track">
-        {ticker2}
+            {ticker2}
         </div>
-    </div>
+        </div>
 
     </div>
     </div>
     """
+
     components.html(html, height=360)
 
 def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
