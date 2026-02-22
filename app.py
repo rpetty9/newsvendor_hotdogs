@@ -14,6 +14,7 @@ from src import config
 from src.scenario import Scenario
 from src.run_sim import simulate_many, evaluate_grid
 import streamlit.components.v1 as components
+from streamlit_js_eval import streamlit_js_eval
 
 Q_MIN = config.Q_MIN
 Q_MAX = config.Q_MAX
@@ -659,7 +660,17 @@ def render_scoreboard(
     </div>
     """
 
-    components.html(html, height=360)
+    # --- mobile-only iframe height (prevents badge bar clipping on phones) ---
+    vw = streamlit_js_eval(
+        js_expressions="window.innerWidth",
+        key="vw_scoreboard",
+        want_output=True,
+    )
+
+    # desktop stays tight; mobile gets extra room for stacked layout
+    height = 520 if (vw is not None and int(vw) < 520) else 320
+
+    components.html(html, height=height)
 
 def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
     lines = []
