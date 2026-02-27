@@ -42,7 +42,7 @@ def set_bg(image_path: str):
         ========================= */
         [data-testid="stAppViewContainer"] {{
             background:
-              linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.75)),
+              linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.35)),
               url("data:image/jpeg;base64,{encoded}");
             background-size: cover;
             background-position: center;
