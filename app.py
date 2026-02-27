@@ -1085,7 +1085,7 @@ with tab_results:
     last = st.session_state.last_run
 
     if last is None:
-        st.warning("Set inputs on the left, then click Run Simulation.")
+        st.warning("Set inputs on the left sidebar, then click Run Simulation.")
     elif "error" in last:
         st.error(last["error"])
         st.subheader("Scenario used")
