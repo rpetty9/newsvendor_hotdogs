@@ -21,7 +21,7 @@ Q_MAX = config.Q_MAX
 MAX_GRID_POINTS = config.MAX_GRID_POINTS
 
 # ============================================================
-# Page config (must be first Streamlit call)
+# Page config
 # ============================================================
 st.set_page_config(
     page_title="Hot Dog Newsvendor Simulator",
@@ -70,12 +70,10 @@ def set_bg(image_path: str):
             border-right: 1px solid rgba(0,0,0,0.06);
         }}
 
-        /* Remove header clash */
         [data-testid="stHeader"] {{
             background: transparent;
         }}
 
-        /* Constrain width for cleaner layout */
         .block-container {{
             max-width: 1200px;
         }}
@@ -143,7 +141,7 @@ st.markdown(
 st.markdown(
     """
     <div style="
-        margin:14px 0 18px;   /* <-- key: pushes it down below the header */
+        margin:14px 0 18px;
         border:1px solid #E0E3EB;
         border-radius:16px;
         padding:12px 14px;
@@ -222,10 +220,9 @@ def apply_theme_css():
         }
 
         /* =========================
-           METRICS (FIX: centered + bold)
+           METRICS
         ========================= */
 
-        /* The card itself */
         div[data-testid="metric-container"], .stMetric{
             background: rgba(255,255,255,0.92) !important;
             border: 1px solid rgba(224,227,235,0.9) !important;
@@ -233,7 +230,6 @@ def apply_theme_css():
             padding: 14px !important;
             box-shadow: 0 8px 22px rgba(0,0,0,0.10);
             
-            /* force layout */
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
@@ -242,7 +238,6 @@ def apply_theme_css():
             text-align: center !important;
         }
 
-        /* Streamlit nests a couple wrapper divs — center those too */
         div[data-testid="metric-container"] > div,
         .stMetric > div{
             width: 100% !important;
@@ -265,7 +260,7 @@ def apply_theme_css():
             color: var(--muted) !important;
         }
 
-        /* Value (big number) */
+        /* Value */
         div[data-testid="metric-container"] [data-testid="stMetricValue"],
         div[data-testid="metric-container"] [data-testid="stMetricValue"] *,
         .stMetric [data-testid="stMetricValue"],
@@ -313,7 +308,7 @@ def apply_theme_css():
 apply_theme_css()
 
 # ============================================================
-# Altair Theme (ketchup/mustard + clean spacing)
+# Altair Theme
 # ============================================================
 KETCHUP = "#D73A2F"
 MUSTARD = "#F4B400"
@@ -395,7 +390,6 @@ WIDGET_KEYS = [
     "temp_f", "rain", "snow",
     "promo", "playoff",
     "team_wins", "team_losses", "opp_wins", "opp_losses",
-    # NEW
     "price_per_dog", "cost_per_dog", "salvage_per_dog",
 ]
 
@@ -484,12 +478,11 @@ def render_scoreboard(
     aa = fmt_int(avg_attendance)
 
     ticker = "".join(badges)
-    ticker2 = ticker + ticker  # duplicate for seamless loop
+    ticker2 = ticker + ticker
 
     html = f"""
     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display:flex; justify-content:center;">
 
-    <!-- IMPORTANT: CSS must be INSIDE this iframe -->
     <style>
         .badge-ticker {{
         position: relative;
@@ -519,8 +512,7 @@ def render_scoreboard(
         }}
 
         /* =========================
-        MOBILE-ONLY SCOREBOARD FIX
-        (Desktop unchanged)
+        mobile-only scoreboard fix
         ========================= */
         @media (max-width: 520px) {{
         .sb-top-row {{
@@ -534,14 +526,12 @@ def render_scoreboard(
             flex: 1 1 100% !important;
         }}
 
-        /* Prevent value breaking like "$65,90" */
         .sb-big-value {{
             white-space: nowrap !important;
             font-size: 28px !important; /* slightly smaller on mobile */
             line-height: 1.05 !important;
         }}
 
-        /* Make VS a clean divider row:  —— VS ——  */
         .sb-vs {{
             flex: 1 1 100% !important;
             min-width: 0 !important;
@@ -569,14 +559,13 @@ def render_scoreboard(
             display: none !important;
         }}
 
-        /* Slightly tighten ticker padding on mobile (helps a bit) */
         .badge-ticker {{
             padding: 8px 10px !important;
         }}
         }}
     </style>
 
-    <!-- OUTER SCOREBOARD (the mounted unit) -->
+    <!-- OUTER SCOREBOARD -->
     <div style="
         width: 100%;
         max-width: 980px;
@@ -602,7 +591,7 @@ def render_scoreboard(
         </div>
         </div>
 
-        <!-- INNER "SCREEN" AREA -->
+        <!-- INNER SCREEN AREA -->
         <div style="padding: 14px 14px 12px; background:#FFFFFF;">
 
         <!-- Big cards row -->
@@ -649,7 +638,7 @@ def render_scoreboard(
         </div>
         </div>
 
-        <!-- BADGE TICKER STRIP (looping) -->
+        <!-- badge ticket strip looping -->
         <div class="badge-ticker">
         <div class="badge-track">
             {ticker2}
@@ -660,14 +649,12 @@ def render_scoreboard(
     </div>
     """
 
-    # --- mobile-only iframe height (prevents badge bar clipping on phones) ---
     vw = streamlit_js_eval(
         js_expressions="window.innerWidth",
         key="vw_scoreboard",
         want_output=True,
     )
 
-    # desktop stays tight; mobile gets extra room for stacked layout
     height = 520 if (vw is not None and int(vw) < 520) else 320
 
     components.html(html, height=height)
@@ -747,12 +734,11 @@ def plot_profit_vs_q_with_refs(results: list[dict], best_q: int):
     line = base.mark_line(color=KETCHUP, strokeWidth=3)
     pts  = base.mark_point(filled=True, size=80, color=KETCHUP, stroke="white", strokeWidth=1)
 
-    # Best Q highlight (mustard)
+    # Best Q highlight
     best_pt = alt.Chart(pd.DataFrame({"Q":[best_q]})).mark_rule(
         color=MUSTARD, strokeWidth=3, strokeDash=[8, 6]
     ).encode(x="Q:Q")
 
-    # $0 reference line (muted)
     zero = alt.Chart(pd.DataFrame({"avg_profit":[0]})).mark_rule(
         color=MUTED, strokeWidth=2, strokeDash=[6, 6], opacity=0.6
     ).encode(y="avg_profit:Q")
@@ -776,7 +762,7 @@ def plot_hist_numeric_eps(eps_values, step: float = 0.02):
             y=alt.Y("count():Q", title="Simulated games"),
             tooltip=[alt.Tooltip("count():Q", title="Games")],
         )
-        .properties(height=300)  # <-- NO padding here
+        .properties(height=300)
     )
 
     mean_line = (
@@ -805,7 +791,6 @@ def plot_hist_numeric(values, title: str, x_title: str, bins: int = 30, x_format
         .properties(height=300, padding={"left": 16, "right": 16, "top": 10, "bottom": 12})
     )
 
-    # only add a title if you actually provided one
     if title and str(title).strip():
         chart = chart.properties(title=title)
 
@@ -883,7 +868,7 @@ with st.sidebar:
         )
 
     with st.expander("Economics (Newsvendor)", expanded=True):
-        # Use config defaults if present, else sensible fallbacks
+        # Use config defaults if present, else fallbacks
         price_per_dog = st.slider(
             "Price per hot dog ($)",
             min_value=0.00,
@@ -911,7 +896,7 @@ with st.sidebar:
             key="salvage_per_dog",
         )
 
-        # Optional: quick sanity warning (not blocking)
+        # quick sanity checks
         if salvage_per_dog > cost_per_dog:
             st.caption("⚠️ Salvage > Cost means leftovers are 'profitable' to over-order (unusual).")
         if price_per_dog <= cost_per_dog:
@@ -1029,7 +1014,7 @@ if run_btn:
                 st.session_state.last_run = {
                     "mode": "single",
                     "scenario": sc,
-                    "Q": q_ran,                 # <--- add
+                    "Q": q_ran,
                     "summary": summary,
                     "meta": run_meta,
                 }
@@ -1093,8 +1078,6 @@ with tab_results:
     elif last.get("mode") == "single":
         summary = last["summary"]
 
-
-        # ---- compute values needed for scoreboard FIRST ----
         traces = summary.get("traces")
 
         sellout_rate: float | None = None
@@ -1105,7 +1088,6 @@ with tab_results:
             avg_attendance = float(np.mean(att))
             sellout_rate = float(np.mean(att >= stadium_capacity))
 
-        # ---- now render scoreboard ----
         render_scoreboard(
             last["scenario"],
             best_q=int(last["Q"]),
@@ -1191,8 +1173,6 @@ with tab_results:
         results = last["results"]
         best_trace = last.get("best_trace")
 
-
-        # ---- compute values needed for scoreboard FIRST ----
         sellout_rate: float | None = None
         avg_attendance: float | None = None
 
@@ -1201,7 +1181,6 @@ with tab_results:
             avg_attendance = float(np.mean(att))
             sellout_rate = float(np.mean(att >= stadium_capacity))
 
-        # ---- now render scoreboard ----
         render_scoreboard(
             last["scenario"],
             best_q=int(best["Q"]),
@@ -1318,9 +1297,8 @@ with tab_results:
         st.subheader("Best Q details")
         st.write(best)
 
-        
 # -------------------------
-# Explanation tab (storytelling)
+# Explanation tab
 # -------------------------
 with tab_explain:
     st.subheader("How to read this dashboard")
@@ -1562,3 +1540,41 @@ The model emphasizes interpretability and decision support rather than exact pre
 It is well-suited for strategic inventory planning and classroom analysis.
 """
         )
+# ============================================================
+# Photo credit (footer)
+# ============================================================
+st.markdown(
+    """
+    <style>
+      .photo-credit {
+        text-align:center;
+        font-size:12px;
+        color:#6B7280;
+        margin-top:30px;
+        padding-bottom:10px;
+      }
+      .photo-credit a {
+        color:#374151;                 /* darker than surrounding text */
+        text-decoration: underline;     /* make it obvious */
+        text-underline-offset: 2px;
+        font-weight: 700;
+      }
+      .photo-credit a:hover {
+        color:#111827;                 /* even darker on hover */
+        text-decoration-thickness: 2px;
+      }
+    </style>
+
+    <div class="photo-credit">
+      Background photo by
+      <a href="https://unsplash.com/@jessicaloaizar" target="_blank" rel="noopener noreferrer">
+        Jessica Loaiza
+      </a>
+      on
+      <a href="https://unsplash.com/photos/hotdog-sandwich-on-white-plate-glqTtszXfM0" target="_blank" rel="noopener noreferrer">
+        Unsplash
+      </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)

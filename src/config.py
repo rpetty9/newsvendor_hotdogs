@@ -1,5 +1,5 @@
 # src/config.py
-# control panel, handles all the input, their distributions, and parameters
+# control panel, handles all the input, distributions, and parameters
 
 # =========================
 # Model Parameters
@@ -44,7 +44,7 @@ PROMO_BOOST = 1.03        # +3%
 PLAYOFF_BOOST = 1.20      # +20%
 
 TEMP_IDEAL_F = 65
-TEMP_PENALTY_PER_10F = 0.02   # 2% penalty per 10°F away from ideal
+TEMP_PENALTY_PER_10F = 0.02
 
 RAIN_PENALTY = 0.90
 SNOW_PENALTY = 0.95

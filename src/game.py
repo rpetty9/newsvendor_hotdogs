@@ -57,7 +57,7 @@ def attendance_multiplier(sc: Scenario) -> float:
     if sc.playoff:
         m *= config.PLAYOFF_BOOST
 
-    # Precipitation: if you later want separate snow penalty, add SNOW_PENALTY to config
+    # Precipitation
     # Weather effects (ignored if indoor)
     if not sc.indoor:
 
@@ -179,7 +179,6 @@ def simulate_one_game(Q: int, sc: Scenario, seed: int | None = None) -> GameResu
 
 
 if __name__ == "__main__":
-    # Quick smoke test (uses Scenario defaults)
     sc = Scenario()
     res = simulate_one_game(Q=20000, sc=sc, seed=42)
     print(res)

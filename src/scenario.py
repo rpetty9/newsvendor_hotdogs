@@ -56,7 +56,6 @@ class Scenario:
         else:
             if self.replications <= 0:
                 raise ValueError("replications must be > 0")
-        # seed can be any int; no strict constraint needed
 
         # -------------------------
         # Capacity
@@ -115,7 +114,6 @@ class Scenario:
             raise ValueError("salvage cannot exceed cost (would create weird incentives).")
 
         if self.price <= self.cost:
-            # don't hard fail if you want, but it's usually a mistake
             raise ValueError("price should be greater than cost (otherwise margin <= 0).")
 
         if self.fixed_cost_per_game < 0:

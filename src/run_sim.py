@@ -1,5 +1,4 @@
 # src/run_sim.py
-
 from __future__ import annotations
 
 import argparse
@@ -46,7 +45,7 @@ def simulate_many(
     stockouts = 0
 
     for _ in range(n):
-        D, a, eps = game.sample_demand(rng, sc)  # <-- sample_demand must return eps now
+        D, a, eps = game.sample_demand(rng, sc)
         res = game.profit_for_game(Q, D, a, sc)
 
         profits.append(res.profit)
@@ -169,7 +168,7 @@ def main() -> None:
     parser.add_argument("--opp_wins", type=int, default=None)
     parser.add_argument("--opp_losses", type=int, default=None)
 
-    # Flags (store_true makes them boolean toggles)
+    # Flags
     parser.add_argument("--rain", action="store_true", help="Enable rain.")
     parser.add_argument("--snow", action="store_true", help="Enable snow.")
     parser.add_argument("--promo", action="store_true", help="Enable promotion.")
@@ -181,7 +180,7 @@ def main() -> None:
     parser.add_argument("--Qmax", type=int, default=30000, help="Grid: maximum Q (inclusive).")
     parser.add_argument("--step", type=int, default=500, help="Grid: step size.")
 
-    # Optional refinement
+    # Refinement
     parser.add_argument("--refine", action="store_true", help="Refine around best Q from coarse grid.")
     parser.add_argument("--refine_width", type=int, default=2000, help="Refine: half-width around best Q.")
     parser.add_argument("--refine_step", type=int, default=100, help="Refine: step size.")
