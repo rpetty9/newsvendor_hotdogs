@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from datetime import datetime
-import textwrap
 import base64
 from pathlib import Path
 
@@ -96,7 +95,6 @@ def set_bg(image_path: str):
             letter-spacing: -0.02em;
             margin-bottom: 10px;
 
-            /* Clean professional gradient text */
             background: linear-gradient(90deg, #D73A2F, #F4B400);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -125,6 +123,7 @@ def set_bg(image_path: str):
         """,
         unsafe_allow_html=True
     )
+
 
 set_bg("pics/hotdog_1.jpg")
 
@@ -229,7 +228,7 @@ def apply_theme_css():
             border-radius: 14px !important;
             padding: 14px !important;
             box-shadow: 0 8px 22px rgba(0,0,0,0.10);
-            
+
             display: flex !important;
             flex-direction: column !important;
             align-items: center !important;
@@ -305,6 +304,7 @@ def apply_theme_css():
         unsafe_allow_html=True,
     )
 
+
 apply_theme_css()
 
 # ============================================================
@@ -316,6 +316,7 @@ INK     = "#111827"
 MUTED   = "#6B7280"
 BORDER  = "#E0E3EB"
 PANEL   = "#FFFFFF"
+
 
 def register_altair_theme():
     def _theme():
@@ -366,6 +367,7 @@ def register_altair_theme():
     alt.themes.register("hotdog_theme", _theme)
     alt.themes.enable("hotdog_theme")
 
+
 register_altair_theme()
 
 st.markdown(
@@ -393,12 +395,28 @@ WIDGET_KEYS = [
     "price_per_dog", "cost_per_dog", "salvage_per_dog",
 ]
 
+# ============================================================
+# Initialize session state defaults
+# ============================================================
+if "temp_f" not in st.session_state:
+    st.session_state["temp_f"] = IDEAL_TEMP_F
+
+if "rain" not in st.session_state:
+    st.session_state["rain"] = False
+
+if "snow" not in st.session_state:
+    st.session_state["snow"] = False
+
+if "indoor" not in st.session_state:
+    st.session_state["indoor"] = False
+
 def handle_indoor_toggle():
     """If indoor turned on, clear weather + set temp to ideal (UI + logic)."""
     if st.session_state.get("indoor"):
         st.session_state["rain"] = False
         st.session_state["snow"] = False
         st.session_state["temp_f"] = IDEAL_TEMP_F
+
 
 def reset_app():
     """Hard reset UI + results."""
@@ -407,6 +425,103 @@ def reset_app():
             del st.session_state[k]
     st.session_state["last_run"] = None
 
+
+def mean_ci_95(values) -> tuple[float | None, float | None, float | None, float | None]:
+    """
+    Returns:
+        mean, standard_error, ci_low, ci_high
+    using normal approx: mean ± 1.96 * SE
+    """
+    arr = np.asarray(values, dtype=float)
+    n = arr.size
+    if n == 0:
+        return None, None, None, None
+
+    mean_val = float(np.mean(arr))
+
+    if n == 1:
+        return mean_val, 0.0, mean_val, mean_val
+
+    sd = float(np.std(arr, ddof=1))
+    se = sd / np.sqrt(n)
+    half_width = 1.96 * se
+    return mean_val, se, mean_val - half_width, mean_val + half_width
+
+
+def proportion_ci_95(p_hat: float, n: int) -> tuple[float | None, float | None]:
+    """
+    Wald-style 95% CI for a proportion.
+    Returns:
+        ci_low, ci_high
+    """
+    if n <= 0:
+        return None, None
+
+    se = np.sqrt((p_hat * (1.0 - p_hat)) / n)
+    half_width = 1.96 * se
+    lo = max(0.0, p_hat - half_width)
+    hi = min(1.0, p_hat + half_width)
+    return lo, hi
+
+
+def expected_shortfall(values, alpha: float = 0.05) -> float | None:
+    """
+    Average of the worst alpha fraction of outcomes.
+    For profit, this is a downside-risk metric.
+    """
+    arr = np.asarray(values, dtype=float)
+    n = arr.size
+    if n == 0:
+        return None
+
+    cutoff = np.quantile(arr, alpha)
+    tail = arr[arr <= cutoff]
+
+    if tail.size == 0:
+        return float(cutoff)
+
+    return float(np.mean(tail))
+
+def render_stat_card(label: str, value: str, height: int = 95):
+    st.markdown(
+        f"""
+        <div style="
+            background: rgba(255,255,255,0.92);
+            border: 1px solid rgba(224,227,235,0.9);
+            border-radius: 14px;
+            padding: 12px 16px;
+            box-shadow: 0 8px 22px rgba(0,0,0,0.10);
+            min-height: {height}px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        ">
+            <div style="
+                font-weight: 800;
+                color: #6B7280;
+                font-size: 0.95rem;
+                margin-bottom: 8px;
+                line-height: 1.2;
+            ">
+                {label}
+            </div>
+            <div style="
+                font-weight: 950;
+                color: #111827;
+                font-size: 1.45rem;
+                line-height: 1.25;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+            ">
+                {value}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    
 # ============================================================
 # Scoreboard + narrative helpers
 # ============================================================
@@ -435,10 +550,8 @@ def render_scoreboard(
     sellout_rate: float | None = None,
     avg_attendance: float | None = None,
 ) -> None:
-    # ---------- badges ----------
     badges = []
 
-    # stadium / weather
     badges.append(_badge("🏟️ Indoor" if sc.indoor else "🌤️ Outdoor", "blue" if sc.indoor else "neutral"))
     badges.append(_badge(f"🧱 Capacity {int(sc.stadium_capacity):,}", "neutral"))
 
@@ -451,22 +564,18 @@ def render_scoreboard(
         if sc.snow:
             badges.append(_badge("❄️ Snow", "blue"))
 
-    # game context
     badges.append(_badge("📣 Promotion" if sc.promo else "🚫 No Promo", "red" if sc.promo else "neutral"))
     badges.append(_badge("🏆 Playoff" if sc.playoff else "🗓️ Regular season", "gold" if sc.playoff else "neutral"))
 
-    # records
     badges.append(_badge(f"🏠 Home {sc.team_wins}-{sc.team_losses}", "neutral"))
     badges.append(_badge(f"🚌 Away {sc.opp_wins}-{sc.opp_losses}", "neutral"))
 
-    # ---------- headline values ----------
     left_label = q_label
     left_value = "—" if best_q is None else f"{int(best_q):,}"
 
     right_label = "AVG PROFIT"
     right_value = "—" if avg_profit is None else f"${int(round(avg_profit)):,}"
 
-    # ---------- subscores ----------
     def fmt_rate(x: float | None) -> str:
         return "—" if x is None else f"{x:.1%}"
 
@@ -501,7 +610,6 @@ def render_scoreboard(
         animation: badge-scroll 18s linear infinite;
         }}
 
-        /* optional: pause on hover */
         .badge-ticker:hover .badge-track {{
         animation-play-state: paused;
         }}
@@ -511,16 +619,12 @@ def render_scoreboard(
         100% {{ transform: translateX(-50%); }}
         }}
 
-        /* =========================
-        mobile-only scoreboard fix
-        ========================= */
         @media (max-width: 520px) {{
         .sb-top-row {{
             flex-wrap: wrap !important;
             gap: 10px !important;
         }}
 
-        /* Cards stack full-width on narrow screens */
         .sb-card {{
             max-width: none !important;
             flex: 1 1 100% !important;
@@ -528,7 +632,7 @@ def render_scoreboard(
 
         .sb-big-value {{
             white-space: nowrap !important;
-            font-size: 28px !important; /* slightly smaller on mobile */
+            font-size: 28px !important;
             line-height: 1.05 !important;
         }}
 
@@ -554,7 +658,6 @@ def render_scoreboard(
             max-width: 140px;
         }}
 
-        /* Hide the old little line block */
         .sb-vs-line {{
             display: none !important;
         }}
@@ -565,7 +668,6 @@ def render_scoreboard(
         }}
     </style>
 
-    <!-- OUTER SCOREBOARD -->
     <div style="
         width: 100%;
         max-width: 980px;
@@ -576,7 +678,6 @@ def render_scoreboard(
         overflow: hidden;
     ">
 
-        <!-- HEADER BAR -->
         <div style="
         padding: 10px 14px;
         background: linear-gradient(180deg, #FAFBFF, #FFFFFF);
@@ -591,10 +692,8 @@ def render_scoreboard(
         </div>
         </div>
 
-        <!-- INNER SCREEN AREA -->
         <div style="padding: 14px 14px 12px; background:#FFFFFF;">
 
-        <!-- Big cards row -->
         <div style="
             background:#FAFBFF;
             border:1px solid #E0E3EB;
@@ -619,7 +718,6 @@ def render_scoreboard(
             </div>
             </div>
 
-            <!-- Subscores row -->
             <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
             <div style="flex:1; max-width:270px; padding:10px 12px; border-radius:12px; background:#FFFFFF; border:1px solid #E0E3EB;">
                 <div style="font-size:12px; color:#6B7280; font-weight:700; text-align:center;">Stockout Rate</div>
@@ -638,7 +736,6 @@ def render_scoreboard(
         </div>
         </div>
 
-        <!-- badge ticket strip looping -->
         <div class="badge-ticker">
         <div class="badge-track">
             {ticker2}
@@ -658,6 +755,7 @@ def render_scoreboard(
     height = 520 if (vw is not None and int(vw) < 520) else 320
 
     components.html(html, height=height)
+
 
 def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
     lines = []
@@ -732,14 +830,13 @@ def plot_profit_vs_q_with_refs(results: list[dict], best_q: int):
     )
 
     line = base.mark_line(color=KETCHUP, strokeWidth=3)
-    pts  = base.mark_point(filled=True, size=80, color=KETCHUP, stroke="white", strokeWidth=1)
+    pts = base.mark_point(filled=True, size=80, color=KETCHUP, stroke="white", strokeWidth=1)
 
-    # Best Q highlight
-    best_pt = alt.Chart(pd.DataFrame({"Q":[best_q]})).mark_rule(
+    best_pt = alt.Chart(pd.DataFrame({"Q": [best_q]})).mark_rule(
         color=MUSTARD, strokeWidth=3, strokeDash=[8, 6]
     ).encode(x="Q:Q")
 
-    zero = alt.Chart(pd.DataFrame({"avg_profit":[0]})).mark_rule(
+    zero = alt.Chart(pd.DataFrame({"avg_profit": [0]})).mark_rule(
         color=MUTED, strokeWidth=2, strokeDash=[6, 6], opacity=0.6
     ).encode(y="avg_profit:Q")
 
@@ -776,6 +873,7 @@ def plot_hist_numeric_eps(eps_values, step: float = 0.02):
     )
 
     st.altair_chart(chart, use_container_width=True)
+
 
 def plot_hist_numeric(values, title: str, x_title: str, bins: int = 30, x_format: str = ".2f"):
     df = pd.DataFrame({"x": np.asarray(values, dtype=float)})
@@ -868,7 +966,6 @@ with st.sidebar:
         )
 
     with st.expander("Economics (Newsvendor)", expanded=True):
-        # Use config defaults if present, else fallbacks
         price_per_dog = st.slider(
             "Price per hot dog ($)",
             min_value=0.00,
@@ -896,7 +993,6 @@ with st.sidebar:
             key="salvage_per_dog",
         )
 
-        # quick sanity checks
         if salvage_per_dog > cost_per_dog:
             st.caption("⚠️ Salvage > Cost means leftovers are 'profitable' to over-order (unusual).")
         if price_per_dog <= cost_per_dog:
@@ -926,7 +1022,6 @@ with st.sidebar:
             min_value=int(config.TEMP_MIN_F),
             max_value=int(config.TEMP_MAX_F),
             key="temp_f",
-            value=int(st.session_state.get("temp_f", int(getattr(config, "TEMP_DEFAULT_F", IDEAL_TEMP_F)))),
             step=1,
             disabled=indoor,
         )
@@ -938,7 +1033,7 @@ with st.sidebar:
             snow_ui = st.checkbox("Snow", key="snow", value=bool(st.session_state.get("snow", False)), disabled=indoor)
 
         if indoor:
-            st.caption(f"Indoor stadium: weather + temperature are ignored (temperature fixed at {IDEAL_TEMP_F}°F).")
+            st.caption(f"Indoor stadium: weather + temperature are ignored.")
 
         temp_f = float(IDEAL_TEMP_F if indoor else temp_f_ui)
         rain = False if indoor else bool(rain_ui)
@@ -976,8 +1071,6 @@ sc = Scenario(
     snow=bool(snow),
     promo=bool(promo),
     playoff=bool(playoff),
-
-    # NEW economics
     price=float(price_per_dog),
     cost=float(cost_per_dog),
     salvage=float(salvage_per_dog),
@@ -1026,9 +1119,6 @@ if run_btn:
                     }
 
                 else:
-                    # ============================
-                    # Grid size safety check
-                    # ============================
                     n_points = (int(Qmax) - int(Qmin)) // int(step) + 1
 
                     if n_points > MAX_GRID_POINTS:
@@ -1063,6 +1153,7 @@ if run_btn:
                             },
                             "meta": run_meta,
                         }
+
 # ============================================================
 # Results tab
 # ============================================================
@@ -1071,13 +1162,14 @@ with tab_results:
 
     if last is None:
         st.warning("Set inputs on the left sidebar, then click Run Simulation.")
+
     elif "error" in last:
         st.error(last["error"])
         st.subheader("Scenario used")
         st.code(str(last.get("scenario")))
+
     elif last.get("mode") == "single":
         summary = last["summary"]
-
         traces = summary.get("traces")
 
         sellout_rate: float | None = None
@@ -1091,7 +1183,7 @@ with tab_results:
         render_scoreboard(
             last["scenario"],
             best_q=int(last["Q"]),
-            q_label="Q (Your Input)", 
+            q_label="Q (Your Input)",
             avg_profit=float(summary["avg_profit"]),
             stockout_rate=float(summary["stockout_rate"]),
             sellout_rate=sellout_rate,
@@ -1100,21 +1192,22 @@ with tab_results:
 
         meta = last.get("meta", {})
         if meta:
-            st.caption(f"Last run: {meta.get('ran_at','')} • Seed: {meta.get('seed','')} • Replications: {meta.get('replications','')}")
-
-        st.subheader("Single Q results")
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Avg Profit", f"${int(round(summary['avg_profit'])):,}")
-        c2.metric("SD Profit", f"${int(round(summary['sd_profit'])):,}")
-        c3.metric("Stockout Rate", f"{summary['stockout_rate']:.1%}")
-        c4.metric("Avg Demand", f"{int(round(summary['avg_demand'])):,}")
+            st.caption(
+                f"Last run: {meta.get('ran_at','')} • Seed: {meta.get('seed','')} • Replications: {meta.get('replications','')}"
+            )
 
         traces = summary.get("traces")
         p05_profit = None
         waste_rate = None
         hotdogs_per_1k = None
         efficiency = None
+
+        profit_se = None
+        profit_ci_low = None
+        profit_ci_high = None
+        stockout_ci_low = None
+        stockout_ci_high = None
+        expected_shortfall_5 = None
 
         if traces:
             att = np.asarray(traces["attendance"], dtype=float)
@@ -1133,13 +1226,51 @@ with tab_results:
             denom = np.maximum(att, 1.0)
             hotdogs_per_1k = float(np.mean((sold_est / denom) * 1000.0))
 
+            n_games = profit.size
+            _, profit_se, profit_ci_low, profit_ci_high = mean_ci_95(profit)
+            stockout_ci_low, stockout_ci_high = proportion_ci_95(
+                float(summary["stockout_rate"]),
+                n_games,
+            )
+            expected_shortfall_5 = expected_shortfall(profit, alpha=0.05)
+
+        st.subheader("Single Q results")
+
+        c1, c2 = st.columns(2)
+        c1.metric("Avg Profit", f"${int(round(summary['avg_profit'])):,}")
+        c2.metric("SD Profit", f"${int(round(summary['sd_profit'])):,}")
+
+        c3, c4 = st.columns(2)
+        c3.metric("SE Profit", "N/A" if profit_se is None else f"${profit_se:,.0f}")
+        c4.metric("Avg Demand", f"{int(round(summary['avg_demand'])):,}")
+
+        c5, c6 = st.columns(2)
+        with c5:
+            render_stat_card(
+                "95% CI: Avg Profit",
+                "N/A" if profit_ci_low is None or profit_ci_high is None
+                else f"[${profit_ci_low:,.0f}, ${profit_ci_high:,.0f}]",
+                height=140,
+            )
+        with c6:
+            render_stat_card(
+                "95% CI: Stockout Rate",
+                "N/A" if stockout_ci_low is None or stockout_ci_high is None
+                else f"[{stockout_ci_low:.1%}, {stockout_ci_high:.1%}]",
+                height=140,
+            )
+
         st.subheader("Concessions performance")
-        m1, m2, m3, m4, m5 = st.columns(5)
+
+        m1, m2, m3 = st.columns(3)
         m1.metric("Downside Profit (5th %ile)", "N/A" if p05_profit is None else f"${int(round(p05_profit)):,}")
-        m2.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
-        m3.metric("Waste Rate", "N/A" if waste_rate is None else f"{waste_rate:.1%}")
-        m4.metric("Order Efficiency", "N/A" if efficiency is None else f"{efficiency:.1%}")
-        m5.metric("Hot Dogs / 1,000 Fans", "N/A" if hotdogs_per_1k is None else f"{int(round(hotdogs_per_1k)):,}")
+        m2.metric("Avg Worst 5% Profit", "N/A" if expected_shortfall_5 is None else f"${int(round(expected_shortfall_5)):,}")
+        m3.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
+
+        m4, m5, m6 = st.columns(3)
+        m4.metric("Waste Rate", "N/A" if waste_rate is None else f"{waste_rate:.1%}")
+        m5.metric("Order Efficiency", "N/A" if efficiency is None else f"{efficiency:.1%}")
+        m6.metric("Hot Dogs / 1,000 Fans", "N/A" if hotdogs_per_1k is None else f"{int(round(hotdogs_per_1k)):,}")
 
         script = make_game_script(
             last["scenario"],
@@ -1192,21 +1323,21 @@ with tab_results:
 
         meta = last.get("meta", {})
         if meta:
-            st.caption(f"Last run: {meta.get('ran_at','')} • Seed: {meta.get('seed','')} • Replications: {meta.get('replications','')}")
-
-        st.subheader("Best Q (by avg_profit)")
-
-        c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("Best Q", f"{int(best['Q']):,}")
-        c2.metric("Avg Profit", f"${int(round(best['avg_profit'])):,}")
-        c3.metric("Stockout Rate", f"{best['stockout_rate']:.1%}")
-        c4.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
-        c5.metric("Avg Attendance", "N/A" if avg_attendance is None else f"{int(round(avg_attendance)):,}")
+            st.caption(
+                f"Last run: {meta.get('ran_at','')} • Seed: {meta.get('seed','')} • Replications: {meta.get('replications','')}"
+            )
 
         p05_profit = None
         waste_rate = None
         hotdogs_per_1k = None
         efficiency = None
+
+        profit_se = None
+        profit_ci_low = None
+        profit_ci_high = None
+        stockout_ci_low = None
+        stockout_ci_high = None
+        expected_shortfall_5 = None
 
         if best_trace and best_trace.get("traces"):
             traces = best_trace["traces"]
@@ -1225,13 +1356,53 @@ with tab_results:
             denom = np.maximum(att, 1.0)
             hotdogs_per_1k = float(np.mean((sold_est / denom) * 1000.0))
 
+            n_games = profit.size
+            _, profit_se, profit_ci_low, profit_ci_high = mean_ci_95(profit)
+            stockout_ci_low, stockout_ci_high = proportion_ci_95(
+                float(best["stockout_rate"]),
+                n_games,
+            )
+            expected_shortfall_5 = expected_shortfall(profit, alpha=0.05)
+
+        st.subheader("Best Q (by avg_profit)")
+
+        r1c1, r1c2, r1c3 = st.columns(3)
+        r1c1.metric("Best Q", f"{int(best['Q']):,}")
+        r1c2.metric("Avg Profit", f"${int(round(best['avg_profit'])):,}")
+        r1c3.metric("SE Profit", "N/A" if profit_se is None else f"${profit_se:,.0f}")
+
+        r2c1, r2c2, r2c3 = st.columns(3)
+        r2c1.metric("Stockout Rate", f"{best['stockout_rate']:.1%}")
+        r2c2.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
+        r2c3.metric("Avg Attendance", "N/A" if avg_attendance is None else f"{int(round(avg_attendance)):,}")
+
+        c7, c8 = st.columns(2)
+        with c7:
+            render_stat_card(
+                "95% CI: Avg Profit",
+                "N/A" if profit_ci_low is None or profit_ci_high is None
+                else f"[${profit_ci_low:,.0f}, ${profit_ci_high:,.0f}]",
+                height=95,
+            )
+        with c8:
+            render_stat_card(
+                "95% CI: Stockout Rate",
+                "N/A" if stockout_ci_low is None or stockout_ci_high is None
+                else f"[{stockout_ci_low:.1%}, {stockout_ci_high:.1%}]",
+                height=95,
+            )
+
         st.subheader("Concessions performance (Best Q)")
-        m1, m2, m3, m4, m5 = st.columns(5)
+
+        m1, m2, m3 = st.columns(3)
         m1.metric("Downside Profit (5th %ile)", "N/A" if p05_profit is None else f"${int(round(p05_profit)):,}")
-        m2.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
-        m3.metric("Waste Rate", "N/A" if waste_rate is None else f"{waste_rate:.1%}")
-        m4.metric("Order Efficiency", "N/A" if efficiency is None else f"{efficiency:.1%}")
-        m5.metric("Hot Dogs / 1,000 Fans", "N/A" if hotdogs_per_1k is None else f"{int(round(hotdogs_per_1k)):,}")
+        m2.metric("Avg Worst 5% Profit", "N/A" if expected_shortfall_5 is None else f"${int(round(expected_shortfall_5)):,}")
+        m3.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
+
+        m4, m5, m6 = st.columns(3)
+        m4.metric("Waste Rate", "N/A" if waste_rate is None else f"{waste_rate:.1%}")
+        m5.metric("Order Efficiency", "N/A" if efficiency is None else f"{efficiency:.1%}")
+        m6.metric("Hot Dogs / 1,000 Fans", "N/A" if hotdogs_per_1k is None else f"{int(round(hotdogs_per_1k)):,}")
 
         script = make_game_script(
             last["scenario"],
@@ -1367,7 +1538,7 @@ When **Indoor stadium** is enabled:
 - Rain and snow are ignored  
 - Temperature is fixed at the ideal level  
 
-This prevents weather effects from being double-counted.
+This ensures outdoor weather does not affect indoor games.
 """
         )
 
@@ -1512,6 +1683,18 @@ $$
 
 Fraction of games where attendance reaches capacity.
 
+### Statistical precision metrics
+
+**SE Profit** shows the standard error of estimated average profit across simulation replications.
+
+**95% CI: Avg Profit** gives an approximate confidence interval for average profit:
+it shows a likely range for the true expected profit under the current scenario.
+
+**95% CI: Stockout Rate** gives an approximate confidence interval for the estimated stockout probability.
+
+**Avg Worst 5% Profit** is an expected shortfall style metric:
+it averages the worst 5% of simulated profit outcomes to show downside risk more clearly than a single percentile cutoff.
+
 ### Distributions
 
 - Demand → customer uncertainty  
@@ -1540,6 +1723,7 @@ The model emphasizes interpretability and decision support rather than exact pre
 It is well-suited for strategic inventory planning and classroom analysis.
 """
         )
+
 # ============================================================
 # Photo credit (footer)
 # ============================================================
@@ -1554,13 +1738,13 @@ st.markdown(
         padding-bottom:10px;
       }
       .photo-credit a {
-        color:#374151;                 /* darker than surrounding text */
-        text-decoration: underline;     /* make it obvious */
+        color:#374151;
+        text-decoration: underline;
         text-underline-offset: 2px;
         font-weight: 700;
       }
       .photo-credit a:hover {
-        color:#111827;                 /* even darker on hover */
+        color:#111827;
         text-decoration-thickness: 2px;
       }
     </style>
