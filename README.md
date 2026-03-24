@@ -1,119 +1,103 @@
 # Monte Carlo Simulation of the Newsvendor Problem
 
 ## Overview
-This project was completed as part of the ISYE 6644 Simulation course in the Master of Science in Analytics program at Georgia Tech.
+This project was completed for ISYE 6644 in the Master of Science in Analytics program at Georgia Tech.
 
-The project has two primary objectives:
-- To develop an interactive Monte Carlo simulation for analyzing the classic Newsvendor inventory optimization problem.
-- To design a professional, user-friendly, and visually engaging analytical application.
+The goal is to build an interactive Monte Carlo simulation for the newsvendor problem and use it to study hot dog inventory decisions for a game-day setting.
 
-The application allows users to explore how demand uncertainty, cost parameters, and service levels impact optimal ordering decisions.
+The app lets the user adjust scenario inputs, simulate demand, compare order quantities, and estimate the order quantity that gives the highest average profit.
 
 ---
 
 ## Project Context
-This project follows a structured simulation study framework,
-including problem formulation, model development, experimentation,
-and analysis.
+The project follows the standard simulation-study flow:
 
-The focus is on translating theoretical inventory models into
-practical, data-driven decision tools.
+- define the decision problem
+- build a demand model
+- run repeated simulation
+- compare decisions under uncertainty
+
+The focus is on showing how uncertainty in attendance and demand affects the recommended order quantity.
 
 ---
 
 ## Background: The Newsvendor Problem
-The Newsvendor problem is a foundational model in operations
-management and supply chain analytics.
+The newsvendor problem is a classic inventory model for a product that must be ordered before uncertain demand is realized.
 
-It addresses the challenge of determining the optimal order quantity
-for a perishable or single-period product under uncertain demand.
+In this project:
 
-Key characteristics include:
-- Single selling period
-- Random demand
-- Unsold inventory has limited salvage value
-- Unmet demand results in lost sales
+- the selling period is one game
+- demand is random
+- leftover hot dogs have limited salvage value
+- unmet demand becomes lost sales
 
-The optimal solution balances:
-- Over-ordering costs
-- Under-ordering costs
+The main tradeoff is ordering too much versus ordering too little.
 
 ---
 
 ## Problem Formulation
 
 ### Objective
-Determine the order quantity of hotdogs Q that maximizes expected profit
-under stochastic demand.
+Choose the hot dog order quantity `Q` that maximizes expected profit under uncertain demand.
 
-Formula used:
-Profit = Selling Price * min(Quantity, Demand) - Purchase Cost * Quantity + Salvage Value * max(Quantity - Demand, 0)
+Profit formula:
 
-#### Subobjectives
-- Simulate profits across many demand realizations
-- choose Q* under different scenarios
-- visualize tradeoffs
-
-
+`Profit = p * min(Q, D) - c * Q + s * max(Q - D, 0)`
 
 ### Decision Variable
-- Q: Order quantity
+- `Q`: order quantity
 
 ### Random Variable
-- D: Demand -> D = A * r * ϵ
-- A = Atttendance
-    - Distribution = Normal(μ,σ^2)
-    - stylized scenario generator taking in outside parameters that intuittivelly affect attendance such as weather (for outdoor stadiums), team record, opponent record, and any special promotions for the game.
-    - only exists to create realistic demand distributions
-- r = hotdogs per attendee
-    - fixed for simplicity and explainability with final number at r = .3
-    - weather will have small multiplicative 
-    - letting ϵ handle slight variations of this variable
-- ϵ = Residual Noise
-    - Distribution = 
-    - represents randomness that happens day-today including concessions traffic patterns, rain delays, game being a blowout, etc.
+- `D`: demand, modeled as `D = A * r * epsilon`
+- `A`: attendance
+- `r`: baseline hot dogs per attendee
+- `epsilon`: residual multiplicative noise
 
-### Parameters that influence our formula
-- Playoff game?
-    - Playoff games usually trump any other factors that come into play. If it's a playoff game, people are coming.
-- Team record
-    - If teams are doing good, the fans will come
-- Opponent record
-    - Fans of the opposing team are more likely to come/travel if there team is performing well
-- Weather
-    - Weather is a big driver in attendance
-    - Weather is also a small driver in hot dogs per attendee as for cold games, fans are more likely to buy warm foods, and vice versa
-        - NOTE: this is only an affect if the stadium is outdoors
+### Scenario Inputs
+The model allows the user to change inputs such as:
+
+- playoff vs regular season
+- team and opponent records
+- weather
+- promotion
+- stadium type and capacity
+
+In the current implementation, these inputs mainly affect attendance. The purchase rate `r` is held fixed.
 
 ### Cost Parameters
-- c: Unit purchase cost
-- p: Unit selling price
-- s: Salvage value
+- `p`: selling price
+- `c`: unit cost
+- `s`: salvage value
 
-### Performance Metric
-- Expected profit
-- Service level
-- Stockout probability
+### Performance Measures
+- average profit
+- stockout rate
+- sellout rate
+- leftover inventory
 
 ---
 
 ## Modeling Approach
 
 ### Demand Modeling
-Demand is modeled using probabilistic distributions estimated
-from historical or assumed data.
+Attendance is modeled with a Normal distribution whose mean is adjusted by the selected scenario.
 
-Monte Carlo sampling is used to generate demand scenarios.
+Demand is then computed from:
+
+- attendance
+- a fixed baseline purchase rate
+- a lognormal noise term
 
 ### Simulation Logic
-For each simulated period:
-1. Sample demand
-2. Compute sales and leftover inventory
-3. Calculate profit
-4. Record outcomes
+For each simulated game:
 
-Thousands of iterations are performed to estimate expected
-performance.
+1. sample attendance
+2. sample demand
+3. compute sales and leftovers
+4. compute profit
+5. store the results
+
+Repeating this many times gives Monte Carlo estimates for profit and other metrics.
 
 ---
 
@@ -123,44 +107,52 @@ performance.
 - Python
 - NumPy
 - Pandas
-- Matplotlib
-- Jupyter
+- Streamlit
+- Altair
 
 ### Project Structure
+```text
 sim_project/
-├── notebooks/
-├── src/
-├── data/
-└── outputs/
-
+|- app.py
+|- src/
+|  |- config.py
+|  |- scenario.py
+|  |- game.py
+|  `- run_sim.py
+|- pics/
+|- .streamlit/
+|- requirements.txt
+`- README.md
+```
 
 ---
 
 ## Results and Analysis
-Key findings include:
-- Sensitivity of optimal Q to demand variance
-- Trade-offs between service level and profitability
-- Impact of cost structure on ordering decisions
+The app is designed to help answer questions like:
 
-(See notebooks for detailed analysis.)
+- how sensitive is the best `Q` to demand uncertainty?
+- how much stockout risk comes with a higher-profit choice?
+- how close are the top two `Q` values?
+
+The dashboard includes point estimates, confidence intervals, and a comparison between the best grid value and the runner-up.
 
 ---
 
 ## Limitations
-- Assumes independent demand
-- Single-period model
-- Simplified cost structure
-
-Future work may incorporate multi-period inventory systems
-and demand learning.
+- single-period model
+- one-product focus
+- no mid-game replenishment
+- no dynamic pricing
+- simplified demand assumptions
+- fixed baseline per-fan purchase rate
 
 ---
 
 ## How to Run
-1. Clone repository
-2. Create virtual environment
-3. Install requirements
-4. Run notebooks
+1. Clone the repository
+2. Create a virtual environment
+3. Install the requirements
+4. Run `streamlit run app.py`
 
 ---
 

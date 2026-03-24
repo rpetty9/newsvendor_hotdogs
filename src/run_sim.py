@@ -161,7 +161,7 @@ def main() -> None:
     parser.add_argument("--n", type=int, default=None, help="Number of replications (simulated games).")
 
     parser.add_argument("--capacity", type=int, default=None, help="Stadium capacity.")
-    parser.add_argument("--temp", type=float, default=None, help="Temperature (°F).")
+    parser.add_argument("--temp", type=float, default=None, help="Temperature (F).")
 
     parser.add_argument("--team_wins", type=int, default=None)
     parser.add_argument("--team_losses", type=int, default=None)
@@ -232,7 +232,7 @@ def main() -> None:
         refined_results = evaluate_grid(refined_Qs, sc=sc)
         best_refined = max(refined_results, key=lambda r: r["avg_profit"])
 
-        print(f"\n=== Refined Search (best±{args.refine_width} by {args.refine_step}) ===")
+        print(f"\n=== Refined Search (best+/-{args.refine_width} by {args.refine_step}) ===")
         print_summary(best_refined)
 
 

@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 from datetime import datetime
+import math
 import base64
 from pathlib import Path
 
@@ -13,7 +14,6 @@ from src import config
 from src.scenario import Scenario
 from src.run_sim import simulate_many, evaluate_grid
 import streamlit.components.v1 as components
-from streamlit_js_eval import streamlit_js_eval
 
 Q_MIN = config.Q_MIN
 Q_MAX = config.Q_MAX
@@ -159,10 +159,10 @@ st.markdown(
         gap:10px;
     ">
       <div style="font-weight:900; letter-spacing:.08em; color:#111827;">
-        🌭🏈 GAME DAY MODE
+        GAME DAY MODE
       </div>
       <div style="color:#6B7280; font-weight:700; font-size:13px;">
-        Pick your <span style="color:#D73A2F; font-weight:900;">Q</span> like a coach calls plays.
+        Choose your <span style="color:#D73A2F; font-weight:900;">Q</span> for the current game scenario.
       </div>
     </div>
     """,
@@ -207,15 +207,6 @@ def apply_theme_css():
         section[data-testid="stSidebar"] > div {
             background: var(--sidebar) !important;
             border-right: 1px solid var(--border) !important;
-        }
-
-        /* ===== Cardify column blocks ===== */
-        div[data-testid="column"]{
-            background: rgba(255,255,255,0.92);
-            border: 1px solid rgba(224,227,235,0.9);
-            border-radius: 14px;
-            padding: 14px 14px 16px 14px;
-            box-shadow: 0 8px 22px rgba(0,0,0,0.10);
         }
 
         /* =========================
@@ -370,15 +361,6 @@ def register_altair_theme():
 
 register_altair_theme()
 
-st.markdown(
-    """
-    <div style="height:3px; border-radius:999px; margin:10px 0 18px;
-                background: linear-gradient(90deg, rgba(229,57,53,0.0), rgba(229,57,53,0.65), rgba(229,57,53,0.0));">
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
 # ============================================================
 # Helpers / constants
 # ============================================================
@@ -482,6 +464,58 @@ def expected_shortfall(values, alpha: float = 0.05) -> float | None:
 
     return float(np.mean(tail))
 
+
+def paired_profit_analysis(values_a, values_b) -> dict[str, float | int | None]:
+    a = np.asarray(values_a, dtype=float)
+    b = np.asarray(values_b, dtype=float)
+
+    if a.size == 0 or b.size == 0 or a.size != b.size:
+        return {
+            "n": None,
+            "mean_diff": None,
+            "se_diff": None,
+            "ci_low": None,
+            "ci_high": None,
+            "z_stat": None,
+            "p_value_two_sided": None,
+        }
+
+    diff = a - b
+    n = int(diff.size)
+    mean_diff = float(np.mean(diff))
+
+    if n == 1:
+        return {
+            "n": n,
+            "mean_diff": mean_diff,
+            "se_diff": 0.0,
+            "ci_low": mean_diff,
+            "ci_high": mean_diff,
+            "z_stat": None,
+            "p_value_two_sided": None,
+        }
+
+    sd_diff = float(np.std(diff, ddof=1))
+    se_diff = sd_diff / np.sqrt(n)
+    half_width = 1.96 * se_diff
+
+    if se_diff == 0.0:
+        z_stat = None
+        p_value = 0.0 if mean_diff != 0.0 else 1.0
+    else:
+        z_stat = mean_diff / se_diff
+        p_value = 2.0 * (1.0 - 0.5 * (1.0 + math.erf(abs(z_stat) / np.sqrt(2.0))))
+
+    return {
+        "n": n,
+        "mean_diff": mean_diff,
+        "se_diff": se_diff,
+        "ci_low": mean_diff - half_width,
+        "ci_high": mean_diff + half_width,
+        "z_stat": z_stat,
+        "p_value_two_sided": p_value,
+    }
+
 def render_stat_card(label: str, value: str, height: int = 95):
     st.markdown(
         f"""
@@ -556,9 +590,9 @@ def render_scoreboard(
     badges.append(_badge(f"🧱 Capacity {int(sc.stadium_capacity):,}", "neutral"))
 
     if sc.indoor:
-        badges.append(_badge(f"🌡️ {int(round(sc.temp_f))}°F (fixed)", "neutral"))
+        badges.append(_badge(f"🌡️ {int(round(sc.temp_f))}F (fixed)", "neutral"))
     else:
-        badges.append(_badge(f"🌡️ {int(round(sc.temp_f))}°F", "neutral"))
+        badges.append(_badge(f"🌡️ {int(round(sc.temp_f))}F", "neutral"))
         if sc.rain:
             badges.append(_badge("🌧️ Rain", "blue"))
         if sc.snow:
@@ -571,16 +605,16 @@ def render_scoreboard(
     badges.append(_badge(f"🚌 Away {sc.opp_wins}-{sc.opp_losses}", "neutral"))
 
     left_label = q_label
-    left_value = "—" if best_q is None else f"{int(best_q):,}"
+    left_value = "-" if best_q is None else f"{int(best_q):,}"
 
     right_label = "AVG PROFIT"
-    right_value = "—" if avg_profit is None else f"${int(round(avg_profit)):,}"
+    right_value = "-" if avg_profit is None else f"${int(round(avg_profit)):,}"
 
     def fmt_rate(x: float | None) -> str:
-        return "—" if x is None else f"{x:.1%}"
+        return "-" if x is None else f"{x:.1%}"
 
     def fmt_int(x: float | None) -> str:
-        return "—" if x is None else f"{int(round(x)):,}"
+        return "-" if x is None else f"{int(round(x)):,}"
 
     so = fmt_rate(stockout_rate)
     se = fmt_rate(sellout_rate)
@@ -590,7 +624,15 @@ def render_scoreboard(
     ticker2 = ticker + ticker
 
     html = f"""
-    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display:flex; justify-content:center;">
+    <style>
+        html, body {{
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }}
+    </style>
+
+    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display:flex; justify-content:center; padding:0;">
 
     <style>
         .badge-ticker {{
@@ -746,15 +788,7 @@ def render_scoreboard(
     </div>
     """
 
-    vw = streamlit_js_eval(
-        js_expressions="window.innerWidth",
-        key="vw_scoreboard",
-        want_output=True,
-    )
-
-    height = 520 if (vw is not None and int(vw) < 520) else 320
-
-    components.html(html, height=height)
+    components.html(html, height=292)
 
 
 def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
@@ -786,11 +820,11 @@ def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
 
     if stockout is not None:
         if stockout >= 0.20:
-            lines.append("Stockouts are frequent — you’re leaving meaningful demand on the table.")
+            lines.append("Stockouts are frequent - you’re leaving meaningful demand on the table.")
         elif stockout >= 0.08:
-            lines.append("Stockouts are moderate — you’re balancing lost sales against waste.")
+            lines.append("Stockouts are moderate - you’re balancing lost sales against waste.")
         else:
-            lines.append("Stockouts are low — you’re prioritizing availability and fan satisfaction.")
+            lines.append("Stockouts are low - you’re prioritizing availability and fan satisfaction.")
 
     if waste is not None:
         if waste >= 0.25:
@@ -802,9 +836,9 @@ def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
 
     if sellout is not None:
         if sellout >= 0.25:
-            lines.append("Sellouts happen often — packed-house games can drive right-tail demand spikes.")
+            lines.append("Sellouts happen often - packed-house games can drive right-tail demand spikes.")
         elif sellout >= 0.10:
-            lines.append("Sellouts occur sometimes — expect occasional demand surges.")
+            lines.append("Sellouts occur sometimes - expect occasional demand surges.")
 
     if mode == "grid":
         lines.append("“Best Q” is the top performer on your tested grid (tighten step size around the peak to refine).")
@@ -815,10 +849,19 @@ def make_game_script(sc: Scenario, out: dict, mode: str) -> str:
 # Charts
 # ============================================================
 def plot_profit_vs_q_with_refs(results: list[dict], best_q: int):
-    chart_df = (
-        pd.DataFrame([{"Q": int(r["Q"]), "avg_profit": float(r["avg_profit"])} for r in results])
-        .sort_values("Q")
-    )
+    rows = []
+    for r in results:
+        n_games = int(r.get("n games", 0))
+        sd_profit = float(r.get("sd_profit", 0.0))
+        se_profit = (sd_profit / np.sqrt(n_games)) if n_games > 0 else 0.0
+        rows.append({
+            "Q": int(r["Q"]),
+            "avg_profit": float(r["avg_profit"]),
+            "ci_low": float(r["avg_profit"]) - 1.96 * se_profit,
+            "ci_high": float(r["avg_profit"]) + 1.96 * se_profit,
+        })
+
+    chart_df = pd.DataFrame(rows).sort_values("Q")
 
     base = alt.Chart(chart_df).encode(
         x=alt.X("Q:Q", title="Order Quantity (Q)", axis=alt.Axis(format=",.0f")),
@@ -826,7 +869,19 @@ def plot_profit_vs_q_with_refs(results: list[dict], best_q: int):
         tooltip=[
             alt.Tooltip("Q:Q", title="Q", format=","),
             alt.Tooltip("avg_profit:Q", title="Avg Profit", format=",.0f"),
+            alt.Tooltip("ci_low:Q", title="95% CI Low", format=",.0f"),
+            alt.Tooltip("ci_high:Q", title="95% CI High", format=",.0f"),
         ],
+    )
+
+    band = (
+        alt.Chart(chart_df)
+        .mark_area(color=MUSTARD, opacity=0.18)
+        .encode(
+            x=alt.X("Q:Q", title="Order Quantity (Q)", axis=alt.Axis(format=",.0f")),
+            y=alt.Y("ci_low:Q", title="Average Profit ($)", axis=alt.Axis(format=",.0f")),
+            y2="ci_high:Q",
+        )
     )
 
     line = base.mark_line(color=KETCHUP, strokeWidth=3)
@@ -841,8 +896,100 @@ def plot_profit_vs_q_with_refs(results: list[dict], best_q: int):
     ).encode(y="avg_profit:Q")
 
     chart = (
-        (line + pts + best_pt + zero)
+        (band + line + pts + best_pt + zero)
         .properties(height=380, padding={"left": 16, "right": 16, "top": 10, "bottom": 12})
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+
+def plot_inventory_flow(avg_sold: float, avg_leftover: float, avg_unmet: float, title: str):
+    df = pd.DataFrame(
+        [
+            {"bucket": "Sold", "value": float(avg_sold), "color": KETCHUP},
+            {"bucket": "Leftover", "value": float(avg_leftover), "color": MUSTARD},
+            {"bucket": "Unmet Demand", "value": float(avg_unmet), "color": "#7F1D1D"},
+        ]
+    )
+
+    domain = ["Sold", "Leftover", "Unmet Demand"]
+    range_ = [KETCHUP, MUSTARD, "#7F1D1D"]
+    max_value = max(float(df["value"].max()), 1.0)
+
+    chart = (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusTopRight=8, cornerRadiusBottomRight=8)
+        .encode(
+            y=alt.Y("bucket:N", title=None, sort=domain),
+            x=alt.X("value:Q", title="Average hot dogs", axis=alt.Axis(format=",.0f"), scale=alt.Scale(domain=[0, max_value * 1.12])),
+            color=alt.Color("bucket:N", scale=alt.Scale(domain=domain, range=range_), legend=None),
+            tooltip=[
+                alt.Tooltip("bucket:N", title="Outcome"),
+                alt.Tooltip("value:Q", title="Average hot dogs", format=",.0f"),
+            ],
+        )
+        .properties(height=320)
+    )
+
+    st.altair_chart(
+        chart.properties(
+            title=title,
+            padding={"left": 16, "right": 16, "top": 10, "bottom": 12},
+        ),
+        use_container_width=True,
+    )
+
+
+def plot_profit_tradeoff(results: list[dict], best_q: int):
+    chart_df = pd.DataFrame(
+        [
+            {
+                "Q": int(r["Q"]),
+                "avg_profit": float(r["avg_profit"]),
+                "stockout_rate": float(r["stockout_rate"]),
+                "avg_leftover": float(r["avg_leftover"]),
+                "is_best": int(r["Q"]) == int(best_q),
+            }
+            for r in results
+        ]
+    )
+    other_points = (
+        alt.Chart(chart_df)
+        .transform_filter("datum.is_best == false")
+        .mark_circle(opacity=0.45, color=MUTED)
+        .encode(
+            x=alt.X("stockout_rate:Q", title="Stockout Rate", axis=alt.Axis(format=".0%")),
+            y=alt.Y("avg_profit:Q", title="Average Profit ($)", axis=alt.Axis(format=",.0f")),
+            size=alt.Size("avg_leftover:Q", title="Avg Leftover", scale=alt.Scale(range=[40, 420])),
+            tooltip=[
+                alt.Tooltip("Q:Q", title="Q", format=","),
+                alt.Tooltip("avg_profit:Q", title="Avg Profit", format=",.0f"),
+                alt.Tooltip("stockout_rate:Q", title="Stockout Rate", format=".1%"),
+                alt.Tooltip("avg_leftover:Q", title="Avg Leftover", format=",.0f"),
+            ],
+        )
+    )
+
+    best_point = (
+        alt.Chart(chart_df)
+        .transform_filter("datum.is_best == true")
+        .mark_circle(opacity=1.0, color=KETCHUP, stroke="white", strokeWidth=2)
+        .encode(
+            x=alt.X("stockout_rate:Q", title="Stockout Rate", axis=alt.Axis(format=".0%")),
+            y=alt.Y("avg_profit:Q", title="Average Profit ($)", axis=alt.Axis(format=",.0f")),
+            size=alt.Size("avg_leftover:Q", title="Avg Leftover", scale=alt.Scale(range=[40, 420])),
+            tooltip=[
+                alt.Tooltip("Q:Q", title="Q", format=","),
+                alt.Tooltip("avg_profit:Q", title="Avg Profit", format=",.0f"),
+                alt.Tooltip("stockout_rate:Q", title="Stockout Rate", format=".1%"),
+                alt.Tooltip("avg_leftover:Q", title="Avg Leftover", format=",.0f"),
+            ],
+        )
+    )
+
+    chart = (
+        (other_points + best_point)
+        .properties(height=320, padding={"left": 16, "right": 16, "top": 10, "bottom": 12})
     )
 
     st.altair_chart(chart, use_container_width=True)
@@ -855,7 +1002,7 @@ def plot_hist_numeric_eps(eps_values, step: float = 0.02):
         alt.Chart(df)
         .mark_bar(color=KETCHUP, opacity=0.70)
         .encode(
-            x=alt.X("eps:Q", bin=alt.Bin(step=step), title="ε (demand multiplier)", axis=alt.Axis(format=".2f")),
+            x=alt.X("eps:Q", bin=alt.Bin(step=step), title="epsilon (demand multiplier)", axis=alt.Axis(format=".2f")),
             y=alt.Y("count():Q", title="Simulated games"),
             tooltip=[alt.Tooltip("count():Q", title="Games")],
         )
@@ -1018,7 +1165,7 @@ with st.sidebar:
 
     with st.expander("Weather", expanded=True):
         temp_f_ui = st.slider(
-            "Temperature (°F)",
+            "Temperature (F)",
             min_value=int(config.TEMP_MIN_F),
             max_value=int(config.TEMP_MAX_F),
             key="temp_f",
@@ -1138,6 +1285,11 @@ if run_btn:
                         best = max(results, key=lambda r: r["avg_profit"])
                         top10 = sorted(results, key=lambda r: r["avg_profit"], reverse=True)[:10]
                         best_trace = simulate_many(Q=int(best["Q"]), sc=sc, return_traces=True)
+                        runner_up = top10[1] if len(top10) > 1 else None
+                        runner_up_trace = (
+                            simulate_many(Q=int(runner_up["Q"]), sc=sc, return_traces=True)
+                            if runner_up is not None else None
+                        )
 
                         st.session_state.last_run = {
                             "mode": "grid",
@@ -1146,6 +1298,8 @@ if run_btn:
                             "best": best,
                             "top10": top10,
                             "best_trace": best_trace,
+                            "runner_up": runner_up,
+                            "runner_up_trace": runner_up_trace,
                             "grid": {
                                 "Qmin": int(Qmin),
                                 "Qmax": int(Qmax),
@@ -1201,6 +1355,7 @@ with tab_results:
         waste_rate = None
         hotdogs_per_1k = None
         efficiency = None
+        avg_unmet = None
 
         profit_se = None
         profit_ci_low = None
@@ -1217,11 +1372,13 @@ with tab_results:
             Q_used = int(last["Q"])
             sold_est = np.minimum(Q_used, demand)
             leftover_est = np.maximum(Q_used - demand, 0)
+            unmet_est = np.maximum(demand - Q_used, 0)
 
             sellout_rate = float(np.mean(att >= stadium_capacity))
             p05_profit = float(np.percentile(profit, 5))
             waste_rate = float(np.mean(leftover_est / max(Q_used, 1)))
             efficiency = float(np.mean(sold_est / max(Q_used, 1)))
+            avg_unmet = float(np.mean(unmet_est))
 
             denom = np.maximum(att, 1.0)
             hotdogs_per_1k = float(np.mean((sold_est / denom) * 1000.0))
@@ -1234,15 +1391,14 @@ with tab_results:
             )
             expected_shortfall_5 = expected_shortfall(profit, alpha=0.05)
 
-        st.subheader("Single Q results")
+        st.subheader("Summary")
 
-        c1, c2 = st.columns(2)
-        c1.metric("Avg Profit", f"${int(round(summary['avg_profit'])):,}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("SE Profit", "N/A" if profit_se is None else f"${profit_se:,.0f}")
         c2.metric("SD Profit", f"${int(round(summary['sd_profit'])):,}")
+        c3.metric("Avg Demand", f"{int(round(summary['avg_demand'])):,}")
 
-        c3, c4 = st.columns(2)
-        c3.metric("SE Profit", "N/A" if profit_se is None else f"${profit_se:,.0f}")
-        c4.metric("Avg Demand", f"{int(round(summary['avg_demand'])):,}")
+        st.subheader("Statistical analysis")
 
         c5, c6 = st.columns(2)
         with c5:
@@ -1260,17 +1416,28 @@ with tab_results:
                 height=140,
             )
 
-        st.subheader("Concessions performance")
+        if traces:
+            plot_hist_numeric(traces["profit"], title="", x_title="Profit per game ($)", bins=30, x_format=",.0f")
+
+        st.subheader("Operational tradeoffs")
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Downside Profit (5th %ile)", "N/A" if p05_profit is None else f"${int(round(p05_profit)):,}")
-        m2.metric("Avg Worst 5% Profit", "N/A" if expected_shortfall_5 is None else f"${int(round(expected_shortfall_5)):,}")
+        m2.metric("Expected Shortfall (5%)", "N/A" if expected_shortfall_5 is None else f"${int(round(expected_shortfall_5)):,}")
         m3.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
 
         m4, m5, m6 = st.columns(3)
         m4.metric("Waste Rate", "N/A" if waste_rate is None else f"{waste_rate:.1%}")
         m5.metric("Order Efficiency", "N/A" if efficiency is None else f"{efficiency:.1%}")
         m6.metric("Hot Dogs / 1,000 Fans", "N/A" if hotdogs_per_1k is None else f"{int(round(hotdogs_per_1k)):,}")
+
+        if avg_unmet is not None:
+            plot_inventory_flow(
+                float(summary["avg_sold"]),
+                float(summary["avg_leftover"]),
+                float(avg_unmet),
+                title="Average inventory flow per game",
+            )
 
         script = make_game_script(
             last["scenario"],
@@ -1285,24 +1452,23 @@ with tab_results:
         st.info(script)
 
         if traces:
-            st.subheader("Profit Distribution (this Q)")
-            plot_hist_numeric(traces["profit"], title="", x_title="Profit per game ($)", bins=30, x_format=",.0f")
-
-            st.subheader("Demand distribution (this Q)")
+            st.subheader("Distribution views")
             plot_hist_numeric(traces["demand"], title="", x_title="Hot dogs demanded", bins=30, x_format=",.0f")
 
-            with st.expander("Optional: Attendance + Noise Distributions", expanded=True):
+            with st.expander("Attendance + Noise Distributions", expanded=True):
                 st.markdown("**Attendance (A)**")
                 plot_hist_numeric(traces["attendance"], title="", x_title="Fans in attendance", bins=30, x_format=",.0f")
 
-                st.markdown("**Multiplicative Noise (ε)**")
-                plot_hist_numeric(traces["eps"], title="", x_title="ε (demand multiplier)", bins=30, x_format=".2f")
+                st.markdown("**Multiplicative Noise (epsilon)**")
+                plot_hist_numeric(traces["eps"], title="", x_title="epsilon (demand multiplier)", bins=30, x_format=".2f")
 
     else:
         best = last["best"]
         top10 = last["top10"]
         results = last["results"]
         best_trace = last.get("best_trace")
+        runner_up = last.get("runner_up")
+        runner_up_trace = last.get("runner_up_trace")
 
         sellout_rate: float | None = None
         avg_attendance: float | None = None
@@ -1331,6 +1497,7 @@ with tab_results:
         waste_rate = None
         hotdogs_per_1k = None
         efficiency = None
+        avg_unmet = None
 
         profit_se = None
         profit_ci_low = None
@@ -1338,6 +1505,7 @@ with tab_results:
         stockout_ci_low = None
         stockout_ci_high = None
         expected_shortfall_5 = None
+        paired_vs_runner = None
 
         if best_trace and best_trace.get("traces"):
             traces = best_trace["traces"]
@@ -1348,10 +1516,12 @@ with tab_results:
             Q_used = int(best["Q"])
             sold_est = np.minimum(Q_used, demand)
             leftover_est = np.maximum(Q_used - demand, 0)
+            unmet_est = np.maximum(demand - Q_used, 0)
 
             p05_profit = float(np.percentile(profit, 5))
             waste_rate = float(np.mean(leftover_est / max(Q_used, 1)))
             efficiency = float(np.mean(sold_est / max(Q_used, 1)))
+            avg_unmet = float(np.mean(unmet_est))
 
             denom = np.maximum(att, 1.0)
             hotdogs_per_1k = float(np.mean((sold_est / denom) * 1000.0))
@@ -1364,17 +1534,20 @@ with tab_results:
             )
             expected_shortfall_5 = expected_shortfall(profit, alpha=0.05)
 
-        st.subheader("Best Q (by avg_profit)")
+            if runner_up_trace and runner_up_trace.get("traces"):
+                paired_vs_runner = paired_profit_analysis(
+                    traces["profit"],
+                    runner_up_trace["traces"]["profit"],
+                )
+
+        st.subheader("Summary")
 
         r1c1, r1c2, r1c3 = st.columns(3)
-        r1c1.metric("Best Q", f"{int(best['Q']):,}")
-        r1c2.metric("Avg Profit", f"${int(round(best['avg_profit'])):,}")
-        r1c3.metric("SE Profit", "N/A" if profit_se is None else f"${profit_se:,.0f}")
+        r1c1.metric("SE Profit", "N/A" if profit_se is None else f"${profit_se:,.0f}")
+        r1c2.metric("Avg Demand", f"{int(round(best['avg_demand'])):,}")
+        r1c3.metric("Avg Leftover", f"{int(round(best['avg_leftover'])):,}")
 
-        r2c1, r2c2, r2c3 = st.columns(3)
-        r2c1.metric("Stockout Rate", f"{best['stockout_rate']:.1%}")
-        r2c2.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
-        r2c3.metric("Avg Attendance", "N/A" if avg_attendance is None else f"{int(round(avg_attendance)):,}")
+        st.subheader("Statistical analysis")
 
         c7, c8 = st.columns(2)
         with c7:
@@ -1392,17 +1565,69 @@ with tab_results:
                 height=95,
             )
 
-        st.subheader("Concessions performance (Best Q)")
+        st.subheader("Best Q vs Runner-up")
+
+        if runner_up is None:
+            st.info("A comparison test needs at least two Q values in the grid.")
+        else:
+            cmp1, cmp2, cmp3 = st.columns(3)
+            cmp1.metric("Runner-up Q", f"{int(runner_up['Q']):,}")
+            cmp2.metric(
+                "Mean Profit Gap",
+                "N/A" if paired_vs_runner is None or paired_vs_runner["mean_diff"] is None
+                else f"${paired_vs_runner['mean_diff']:,.0f}",
+            )
+            cmp3.metric(
+                "Two-sided p-value",
+                "N/A" if paired_vs_runner is None or paired_vs_runner["p_value_two_sided"] is None
+                else f"{paired_vs_runner['p_value_two_sided']:.4f}",
+            )
+
+            cmp4, cmp5 = st.columns(2)
+            with cmp4:
+                render_stat_card(
+                    "95% CI: Profit Gap",
+                    "N/A" if paired_vs_runner is None or paired_vs_runner["ci_low"] is None or paired_vs_runner["ci_high"] is None
+                    else f"[${paired_vs_runner['ci_low']:,.0f}, ${paired_vs_runner['ci_high']:,.0f}]",
+                    height=95,
+                )
+            with cmp5:
+                verdict = "N/A"
+                if paired_vs_runner is not None and paired_vs_runner["ci_low"] is not None and paired_vs_runner["ci_high"] is not None:
+                    if paired_vs_runner["ci_low"] > 0:
+                        verdict = "Best Q is statistically higher"
+                    elif paired_vs_runner["ci_high"] < 0:
+                        verdict = "Runner-up is statistically higher"
+                    else:
+                        verdict = "Difference is not statistically clear"
+                render_stat_card("Comparison Verdict", verdict, height=95)
+
+        plot_profit_vs_q_with_refs(results, best_q=int(best["Q"]))
+
+        st.subheader("Operational tradeoffs")
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Downside Profit (5th %ile)", "N/A" if p05_profit is None else f"${int(round(p05_profit)):,}")
-        m2.metric("Avg Worst 5% Profit", "N/A" if expected_shortfall_5 is None else f"${int(round(expected_shortfall_5)):,}")
+        m2.metric("Expected Shortfall (5%)", "N/A" if expected_shortfall_5 is None else f"${int(round(expected_shortfall_5)):,}")
         m3.metric("Sellout Rate", "N/A" if sellout_rate is None else f"{sellout_rate:.1%}")
 
         m4, m5, m6 = st.columns(3)
         m4.metric("Waste Rate", "N/A" if waste_rate is None else f"{waste_rate:.1%}")
         m5.metric("Order Efficiency", "N/A" if efficiency is None else f"{efficiency:.1%}")
         m6.metric("Hot Dogs / 1,000 Fans", "N/A" if hotdogs_per_1k is None else f"{int(round(hotdogs_per_1k)):,}")
+
+        if avg_unmet is not None:
+            left_col, right_col = st.columns(2)
+            with left_col:
+                plot_inventory_flow(
+                    float(best["avg_sold"]),
+                    float(best["avg_leftover"]),
+                    float(avg_unmet),
+                    title="Average inventory flow at best Q",
+                )
+            with right_col:
+                plot_profit_tradeoff(results, best_q=int(best["Q"]))
+                st.caption(f"Best Q highlighted: {int(best['Q']):,}. Higher is better. Farther left means fewer stockouts.")
 
         script = make_game_script(
             last["scenario"],
@@ -1444,25 +1669,22 @@ with tab_results:
             if col in df.columns:
                 df[col] = (df[col] * 100).round(1).astype(str) + "%"
 
+        st.subheader("Grid summary")
         st.dataframe(df, use_container_width=True)
-
-        st.subheader("Profit vs Q (grid)")
-        plot_profit_vs_q_with_refs(results, best_q=int(best["Q"]))
 
         if best_trace and best_trace.get("traces"):
             traces = best_trace["traces"]
 
-            st.subheader("Profit Distribution (Best Q)")
+            st.subheader("Distribution views")
             plot_hist_numeric(traces["profit"], title="", x_title="Profit per game ($)", bins=30, x_format=",.0f")
 
-            st.subheader("Demand Distribution (Best Q)")
             plot_hist_numeric(traces["demand"], title="", x_title="Hot dogs demanded", bins=30, x_format=",.0f")
 
-            with st.expander("Optional: Attendance + Noise Distributions (Best Q)", expanded=True):
+            with st.expander("Attendance + Noise Distributions (Best Q)", expanded=True):
                 st.markdown("**Attendance (A)**")
                 plot_hist_numeric(traces["attendance"], title="", x_title="Fans in attendance", bins=30, x_format=",.0f")
 
-                st.markdown("**Multiplicative Noise (ε)**")
+                st.markdown("**Multiplicative Noise (epsilon)**")
                 plot_hist_numeric_eps(traces["eps"])
 
         st.subheader("Best Q details")
@@ -1476,60 +1698,67 @@ with tab_explain:
 
     st.markdown(
         """
-**What you’re deciding:** the order quantity **Q** (how many hot dogs to stock).  
+**What you're deciding:** the order quantity **Q**.  
 
-**What the simulator models:** game-to-game uncertainty in attendance and buying behavior.  
+**What the simulator models:** game-to-game uncertainty in attendance and demand.  
 
-**What “best Q” means:** the Q that maximizes **average profit** on your tested grid, given the current scenario.
+**What "best Q" means:** the tested Q with the highest estimated average profit under the current scenario.
 """
     )
 
     with st.expander("Demand model: what each piece means", expanded=False):
         st.markdown(
-            """
+            r"""
 ### Core demand equation
 
 We model game demand as:
 
 $$
-D = \\mathrm{round}(A \\cdot r \\cdot \\varepsilon)
+D = \mathrm{round}(A \cdot r \cdot \varepsilon)
 $$
 
 **Where:**
 
 - **A (Attendance)** = how many fans show up  
-- **r (Hot dogs per attendee)** = baseline purchase rate (expected hot dogs per fan)  
-- **ε (Epsilon noise)** = multiplicative randomness capturing “everything else”  
-  (appetite, lines, demographics, vendor placement, etc.)
+- **r (Hot dogs per attendee)** = fixed baseline purchase rate  
+- **ε (Epsilon noise)** = multiplicative residual randomness
 
 ### Why multiplicative noise?
 
-We use multiplicative noise because crowds tend to scale demand:
+We use multiplicative noise so demand variability scales with crowd size:
 
-- Big crowds → bigger swings in absolute demand  
-- Small crowds → smaller swings  
+- Big crowds -> bigger swings in absolute demand  
+- Small crowds -> smaller swings  
 
 ### Rounding / integer demand
 
-Hot dogs are discrete units, so we round demand to an integer.  
-This adds a small amount of discretization error, but makes the simulation realistic.
+Hot dogs are discrete units, so simulated demand is rounded to an integer.
 """
         )
 
-    with st.expander("Attendance (A): capacity, sellouts, and indoor stadium behavior", expanded=False):
+    with st.expander("Attendance (A): how scenario inputs affect demand", expanded=False):
         st.markdown(
-            """
+            r"""
+### Attendance model
+
+Attendance is the main scenario-driven part of the demand model.
+
+The code:
+
+1. Starts with a baseline mean tied to stadium capacity  
+2. Adjusts that mean using multipliers for promotions, playoffs, weather, and team quality  
+3. Samples attendance from a Normal distribution  
+4. Caps attendance at stadium capacity
+
 ### Capacity capping and sellouts
 
-Attendance is bounded:
+Attendance is bounded by:
 
 $$
-0 \\le A \\le \\text{Stadium Capacity}
+0 \le A \le \text{Stadium Capacity}
 $$
 
-If the simulated attendance exceeds capacity, it is capped.
-
-This creates visible “spikes” at capacity in the histogram, representing sellout games.
+If simulated attendance exceeds capacity, it is capped. That creates visible mass at capacity in the attendance distribution, representing sellout games.
 
 ### Indoor stadium behavior
 
@@ -1538,46 +1767,39 @@ When **Indoor stadium** is enabled:
 - Rain and snow are ignored  
 - Temperature is fixed at the ideal level  
 
-This ensures outdoor weather does not affect indoor games.
+This prevents outdoor weather effects from changing indoor attendance.
 """
         )
 
-    with st.expander("Purchase rate (r): how scenario inputs affect demand", expanded=False):
+    with st.expander("Purchase rate (r): fixed consumption assumption", expanded=False):
         st.markdown(
             """
-### Baseline rate and multipliers
+### Fixed baseline rate
 
-The baseline purchase rate **r** represents expected hot dogs per fan.
+The purchase rate **r** is the expected number of hot dogs purchased per attendee.
 
-Scenario factors modify this rate using multipliers:
+In the current implementation, this rate is fixed:
 
 $$
-r_{\\text{effective}}
-=
-r_0
-\\times m_{\\text{promo}}
-\\times m_{\\text{playoff}}
-\\times m_{\\text{weather}}
-\\times m_{\\text{record}}
+r = r_0 = 0.30
 $$
 
-**Interpretation:**
+Scenario inputs do **not** directly change `r` in the current code. They affect demand through attendance instead.
 
-- Promotions increase buying behavior  
-- Playoffs increase excitement  
-- Team records influence fan engagement  
-- Weather affects comfort and concessions usage  
+### Why keep r fixed?
 
-This keeps the model interpretable and easy to calibrate.
+- It keeps the model simple and interpretable  
+- It avoids double-counting effects already captured in attendance  
+- It makes the demand decomposition clearer: attendance drives scale, epsilon drives residual variation
 """
         )
 
-    with st.expander("Noise term ε: randomness and uncertainty", expanded=False):
+    with st.expander("Noise term epsilon: randomness and uncertainty", expanded=False):
         st.markdown(
-            """
+            r"""
 ### Why lognormal noise?
 
-The ε term is modeled using a Lognormal distribution:
+The epsilon term is modeled using a Lognormal distribution:
 
 - Always positive  
 - Allows occasional unusually high-demand games  
@@ -1588,26 +1810,26 @@ The ε term is modeled using a Lognormal distribution:
 We set:
 
 $$
-E[\\varepsilon] \\approx 1
+E[\varepsilon] \approx 1
 $$
 
-This ensures randomness adds variability without biasing demand upward or downward.
+This lets epsilon add variability without systematically pushing demand up or down.
 """
         )
 
     with st.expander("Profit model: Newsvendor formulation", expanded=False):
         st.markdown(
-            """
+            r"""
 ### Profit per game
 
 $$
-\\Pi(Q,D)
+\Pi(Q,D)
 =
-p\\min(Q,D)
+p\min(Q,D)
 -
 cQ
 +
-s\\max(Q-D,0)
+s\max(Q-D,0)
 -
 F
 $$
@@ -1630,25 +1852,25 @@ $$
 **2) Leftovers (D < Q):**
 
 - Sold = D  
-- Leftover = Q − D  
-- Salvage recovers partial cost  
+- Leftover = Q - D  
+- Salvage recovers part of the leftover cost
 
-This matches the classic single-period newsvendor setting.
+This is the classic single-period newsvendor setup.
 """
         )
 
-    with st.expander("What “optimal Q” means in this simulation", expanded=False):
+    with st.expander("What 'optimal Q' means in this simulation", expanded=False):
         st.markdown(
-            """
+            r"""
 ### Monte Carlo estimation
 
 Expected profit is estimated using simulation:
 
 $$
-\\widehat{E[\\Pi(Q)]}
+\widehat{E[\Pi(Q)]}
 =
-\\frac{1}{N}
-\\sum_{i=1}^{N} \\Pi(Q, D_i)
+\frac{1}{N}
+\sum_{i=1}^{N} \Pi(Q, D_i)
 $$
 
 Because this is simulation-based:
@@ -1656,17 +1878,19 @@ Because this is simulation-based:
 - Results depend on random seed  
 - More replications improve stability  
 
-### Grid search limitation
+### Grid search interpretation
 
-Q is optimized only over tested grid values.
+In grid-search mode, the app evaluates a set of candidate Q values and selects the one with the highest estimated average profit.
 
-Smaller step sizes provide more precise estimates.
+That means the reported best Q is the best among the tested grid points, not the exact continuous optimum.
+
+Smaller step sizes provide a more refined search.
 """
         )
 
     with st.expander("Metric definitions", expanded=False):
         st.markdown(
-            """
+            r"""
 ### Stockout rate
 
 $$
@@ -1678,49 +1902,57 @@ Fraction of games where demand exceeds supply.
 ### Sellout rate
 
 $$
-P(A \\ge \\text{Capacity})
+P(A \ge \text{Capacity})
 $$
 
-Fraction of games where attendance reaches capacity.
+Fraction of games where attendance reaches stadium capacity.
 
 ### Statistical precision metrics
 
 **SE Profit** shows the standard error of estimated average profit across simulation replications.
 
-**95% CI: Avg Profit** gives an approximate confidence interval for average profit:
-it shows a likely range for the true expected profit under the current scenario.
+**95% CI: Avg Profit** gives an approximate confidence interval for expected profit under the current scenario.
 
 **95% CI: Stockout Rate** gives an approximate confidence interval for the estimated stockout probability.
 
-**Avg Worst 5% Profit** is an expected shortfall style metric:
-it averages the worst 5% of simulated profit outcomes to show downside risk more clearly than a single percentile cutoff.
+**Expected Shortfall (5%)** averages the worst 5% of simulated profit outcomes and highlights downside risk more clearly than a single percentile cutoff.
+
+**Best Q vs Runner-up** compares the top two Q values using paired simulation output from the same random stream. The profit-gap confidence interval and p-value show whether the selected best Q meaningfully outperforms the next-best option.
+
+**Profit vs Q** shows the average-profit curve across tested order quantities, with a 95% confidence band around each estimate.
+
+**Average inventory flow** breaks the typical game into sold hot dogs, leftovers, and unmet demand.
+
+**Risk-return map** shows the tradeoff between average profit and stockout risk across the tested Q values.
 
 ### Distributions
 
-- Demand → customer uncertainty  
-- Profit → business risk  
-- Attendance → crowd variability  
-- ε → unexplained randomness
+- Demand -> customer uncertainty  
+- Profit -> business risk  
+- Attendance -> crowd variability  
+- epsilon -> unexplained randomness
 """
         )
 
     with st.expander("Model assumptions and limitations", expanded=False):
         st.markdown(
             """
-This model is intentionally simplified.
+This model is intentionally simplified and designed for decision support rather than exact forecasting.
 
 ### Key assumptions
 
-- No dynamic pricing  
+- Single-period decision  
 - No mid-game replenishment  
+- No dynamic pricing  
 - No product substitution  
-- Single-item focus  
-- Parameters assumed stable  
+- One product focus  
+- Fixed per-fan baseline purchase rate  
+- Parameters treated as stable within a scenario  
 
 ### Implication
 
-The model emphasizes interpretability and decision support rather than exact prediction.
-It is well-suited for strategic inventory planning and classroom analysis.
+The model emphasizes interpretability, scenario analysis, and inventory tradeoffs.
+It is well-suited for classroom analysis and for illustrating how uncertainty affects the recommended order quantity.
 """
         )
 
@@ -1762,3 +1994,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+

@@ -91,7 +91,7 @@ def sample_epsilon(rng: random.Random) -> float:
     lognormal with sigma in log-space (EPS_SIGMA).
     """
     sigma = config.EPS_SIGMA
-    mu = -0.5 * sigma * sigma  # so E[epsilon] ≈ 1
+    mu = -0.5 * sigma * sigma  # so E[epsilon] ~ 1
     return rng.lognormvariate(mu, sigma)
 
 
