@@ -3,6 +3,8 @@
 ## Overview
 This project was completed for ISYE 6644 in the Master of Science in Analytics program at Georgia Tech.
 
+Can find demo at this link: https://hotdog-newsvendor.streamlit.app/ (may need to wait 30 seconds for it to wake up on streamlit services)
+
 The goal is to build an interactive Monte Carlo simulation for the newsvendor problem and use it to study hot dog inventory decisions for a game-day setting.
 
 The app lets the user adjust scenario inputs, simulate demand, compare order quantities, and estimate the order quantity that gives the highest average profit.
