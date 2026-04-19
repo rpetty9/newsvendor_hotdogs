@@ -393,7 +393,7 @@ if "indoor" not in st.session_state:
     st.session_state["indoor"] = False
 
 def handle_indoor_toggle():
-    """If indoor turned on, clear weather + set temp to ideal (UI + logic)."""
+    """Set weather inputs for an indoor stadium."""
     if st.session_state.get("indoor"):
         st.session_state["rain"] = False
         st.session_state["snow"] = False
@@ -401,7 +401,7 @@ def handle_indoor_toggle():
 
 
 def reset_app():
-    """Hard reset UI + results."""
+    """Reset saved inputs and results."""
     for k in WIDGET_KEYS:
         if k in st.session_state:
             del st.session_state[k]
@@ -1403,7 +1403,7 @@ with tab_results:
         c5, c6 = st.columns(2)
         with c5:
             render_stat_card(
-                "95% CI: Avg Profit",
+                "95% CI: Expected Avg Profit",
                 "N/A" if profit_ci_low is None or profit_ci_high is None
                 else f"[${profit_ci_low:,.0f}, ${profit_ci_high:,.0f}]",
                 height=140,
@@ -1552,7 +1552,7 @@ with tab_results:
         c7, c8 = st.columns(2)
         with c7:
             render_stat_card(
-                "95% CI: Avg Profit",
+                "95% CI: Expected Avg Profit",
                 "N/A" if profit_ci_low is None or profit_ci_high is None
                 else f"[${profit_ci_low:,.0f}, ${profit_ci_high:,.0f}]",
                 height=95,
@@ -1911,7 +1911,7 @@ Fraction of games where attendance reaches stadium capacity.
 
 **SE Profit** shows the standard error of estimated average profit across simulation replications.
 
-**95% CI: Avg Profit** gives an approximate confidence interval for expected profit under the current scenario.
+**95% CI: Expected Avg Profit** gives an approximate confidence interval for the expected average profit under the current scenario.
 
 **95% CI: Stockout Rate** gives an approximate confidence interval for the estimated stockout probability.
 

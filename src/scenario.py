@@ -10,10 +10,7 @@ from . import config
 @dataclass(frozen=True)
 class Scenario:
     """
-    Scenario = user-controlled inputs (sliders/radios) for a simulation run.
-
-    Keep model coefficients/assumptions in config.py.
-    Keep one run's inputs here, with validation so the UI can't break the model.
+    Scenario inputs for one simulation run.
     """
 
     # ---- simulation controls ----

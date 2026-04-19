@@ -33,13 +33,11 @@ def _clip(x: float, lo: float, hi: float) -> float:
 
 def _win_pct_multiplier(win_pct: float, boost_at_1: float, min_mult: float = 0.80) -> float:
     """
-    Centered scaling around 0.500 so bad teams can reduce attendance, good teams increase it.
+    Centered scaling around 0.500 so lower win rates reduce attendance and higher win rates increase it.
 
     - win_pct = 1.0 -> multiplier = boost_at_1
     - win_pct = 0.5 -> multiplier = 1.0
     - win_pct = 0.0 -> multiplier = 2 - boost_at_1  (then clamped by min_mult)
-
-    This matches intuition better than always-positive effects.
     """
     slope = boost_at_1 - 1.0
     m = 1.0 + (win_pct - 0.5) * 2.0 * slope
@@ -170,8 +168,7 @@ def profit_for_game(Q: int, D: int, attendance: int, sc: Scenario) -> GameResult
 
 def simulate_one_game(Q: int, sc: Scenario, seed: int | None = None) -> GameResult:
     """
-    Convenience wrapper: simulate one game under a scenario and compute profit.
-    If seed is provided, it overrides sc.seed for this single call.
+    Simulate one game under a scenario and compute profit.
     """
     rng = random.Random(sc.seed if seed is None else seed)
     D, a, _ = sample_demand(rng, sc)

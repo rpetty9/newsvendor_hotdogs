@@ -99,8 +99,6 @@ def evaluate_grid(
 ) -> list[dict]:
     """
     Evaluate multiple Q values under the same Scenario.
-
-    Note: using the SAME seed for each Q gives 'common random numbers' (fair comparisons).
     """
     return [simulate_many(Q=Q, sc=sc, n=n, seed=seed) for Q in Q_values]
 
